@@ -100,6 +100,10 @@ HWComposer::HWComposer(
 {
     for (size_t i =0 ; i<MAX_DISPLAYS ; i++) {
         mLists[i] = 0;
+        mFrame[i].left = 0;
+        mFrame[i].top = 0;
+        mFrame[i].right = -1;
+        mFrame[i].bottom = -1;
     }
 
     char value[PROPERTY_VALUE_MAX];
@@ -596,6 +600,10 @@ status_t HWComposer::prepare() {
                 mLists[i]->dpy = EGL_NO_DISPLAY;
                 mLists[i]->sur = EGL_NO_SURFACE;
             }
+            mLists[i]->frame.left = mFrame[i].left;
+            mLists[i]->frame.top = mFrame[i].top ;
+            mLists[i]->frame.right = mFrame[i].right;
+            mLists[i]->frame.bottom = mFrame[i].bottom;
         }
     }
 
@@ -629,6 +637,14 @@ status_t HWComposer::prepare() {
                 }
             }
         }
+    }
+    else
+    {
+        for (size_t i=0 ; i<mNumDisplays ; i++) {
+            DisplayData& disp(mDisplayData[i]);
+            disp.hasFbComp = false;
+            disp.hasOvComp = false;
+            }
     }
     return (status_t)err;
 }
@@ -984,13 +1000,14 @@ void HWComposer::dump(String8& result, char* buffer, size_t SIZE) const {
                         disp.list->numHwLayers, disp.list->flags);
 
                 result.append(
-                        "    type    |  handle  |   hints  |   flags  | tr | blend |  format  |       source crop         |           frame           name \n"
+                        "    type    |  handle  |   hints  |   flags  | tr | blend |  format  |  usage   |       source crop         |           frame           name \n"
                         "------------+----------+----------+----------+----+-------+----------+---------------------------+--------------------------------\n");
                 //      " __________ | ________ | ________ | ________ | __ | _____ | ________ | [_____,_____,_____,_____] | [_____,_____,_____,_____]
                 for (size_t i=0 ; i<disp.list->numHwLayers ; i++) {
                     const hwc_layer_1_t&l = disp.list->hwLayers[i];
                     int32_t format = -1;
                     String8 name("unknown");
+                    uint32_t usage = 0;
 
                     if (i < visibleLayersSortedByZ.size()) {
                         const sp<Layer>& layer(visibleLayersSortedByZ[i]);
@@ -998,6 +1015,7 @@ void HWComposer::dump(String8& result, char* buffer, size_t SIZE) const {
                                 layer->getActiveBuffer());
                         if (buffer != NULL) {
                             format = buffer->getPixelFormat();
+                            usage= buffer->getUsage();
                         }
                         name = layer->getName();
                     }
@@ -1006,6 +1024,7 @@ void HWComposer::dump(String8& result, char* buffer, size_t SIZE) const {
                     if (type == HWC_FRAMEBUFFER_TARGET) {
                         name = "HWC_FRAMEBUFFER_TARGET";
                         format = disp.format;
+                        usage = 0x1a00;
                     }
 
                     static char const* compositionTypeName[] = {
@@ -1018,9 +1037,9 @@ void HWComposer::dump(String8& result, char* buffer, size_t SIZE) const {
                         type = NELEM(compositionTypeName) - 1;
 
                     result.appendFormat(
-                            " %10s | %08x | %08x | %08x | %02x | %05x | %08x | [%5d,%5d,%5d,%5d] | [%5d,%5d,%5d,%5d] %s\n",
+                            " %10s | %08x | %08x | %08x | %02x | %05x | %08x | %08x | [%5d,%5d,%5d,%5d] | [%5d,%5d,%5d,%5d] %s\n",
                                     compositionTypeName[type],
-                                    intptr_t(l.handle), l.hints, l.flags, l.transform, l.blending, format,
+                                    intptr_t(l.handle), l.hints, l.flags, l.transform, l.blending, format, usage,
                                     l.sourceCrop.left, l.sourceCrop.top, l.sourceCrop.right, l.sourceCrop.bottom,
                                     l.displayFrame.left, l.displayFrame.top, l.displayFrame.right, l.displayFrame.bottom,
                                     name.string());
@@ -1033,6 +1052,22 @@ void HWComposer::dump(String8& result, char* buffer, size_t SIZE) const {
         mHwc->dump(mHwc, buffer, SIZE);
         result.append(buffer);
     }
+}
+
+void HWComposer::setDisplayProject(int disp, const Rect& frame)
+{
+    mFrame[disp].left = frame.leftTop().x;
+    mFrame[disp].top = frame.leftTop().y;
+    mFrame[disp].right = frame.rightBottom().x;
+    mFrame[disp].bottom = frame.rightBottom().y;
+}
+
+int HWComposer::setDisplayParameter(int cmd, int disp, int para0, int para1) const {
+    if (mHwc) {
+        return mHwc->setParameter(mHwc, cmd, disp, para0, para1);
+    }
+
+    return NO_INIT;
 }
 
 // ---------------------------------------------------------------------------

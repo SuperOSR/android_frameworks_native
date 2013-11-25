@@ -221,6 +221,20 @@ public:
         memcpy(info, reply.readInplace(sizeof(DisplayInfo)), sizeof(DisplayInfo));
         return reply.readInt32();
     }
+
+    virtual int setDisplayParameter(const sp<IBinder>& display, int cmd, int para0,
+        int para1, int para2)
+    {
+        Parcel data, reply;
+        data.writeInterfaceToken(ISurfaceComposer::getInterfaceDescriptor());
+        data.writeStrongBinder(display);
+        data.writeInt32(cmd);
+        data.writeInt32(para0);
+        data.writeInt32(para1);
+        data.writeInt32(para2);
+        remote()->transact(BnSurfaceComposer::SET_DISPLAY_PARAMETER, data, &reply);
+        return reply.readInt32();
+    }
 };
 
 IMPLEMENT_META_INTERFACE(SurfaceComposer, "android.ui.ISurfaceComposer");
@@ -325,6 +339,16 @@ status_t BnSurfaceComposer::onTransact(
             sp<IBinder> display = data.readStrongBinder();
             status_t result = getDisplayInfo(display, &info);
             memcpy(reply->writeInplace(sizeof(DisplayInfo)), &info, sizeof(DisplayInfo));
+            reply->writeInt32(result);
+        } break;
+        case SET_DISPLAY_PARAMETER: {
+            CHECK_INTERFACE(ISurfaceComposer, data, reply);
+            sp<IBinder> display = data.readStrongBinder();
+            int cmd = data.readInt32();
+            int para0 = data.readInt32();
+            int para1 = data.readInt32();
+            int para2 = data.readInt32();
+            int result = setDisplayParameter(display, cmd, para0, para1, para2);
             reply->writeInt32(result);
         } break;
         default:

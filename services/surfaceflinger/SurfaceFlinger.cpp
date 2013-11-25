@@ -224,6 +224,7 @@ void SurfaceFlinger::bootFinished()
     const nsecs_t now = systemTime();
     const nsecs_t duration = now - mBootTime;
     ALOGI("Boot is finished (%ld ms)", long(ns2ms(duration)) );
+	ALOGI("Total boot time is (%ld ms)", long(ns2ms(now)));
     mBootFinished = true;
 
     // wait patiently for the window manager death
@@ -653,6 +654,31 @@ status_t SurfaceFlinger::getDisplayInfo(const sp<IBinder>& display, DisplayInfo*
 
     // All non-virtual displays are currently considered secure.
     info->secure = true;
+
+    if (type == DisplayDevice::DISPLAY_PRIMARY) {
+        char property[PROPERTY_VALUE_MAX];
+        if (property_get("ro.sf.rotation", property, NULL) > 0) {
+            switch (atoi(property)) {
+                case 90:
+                    info->orientation = (info->orientation - 1 + 4) % 4;
+                    info->w = hwc.getHeight(type);
+                    info->h = hwc.getWidth(type);
+                    info->xdpi = ydpi;
+                    info->ydpi = xdpi;
+                    break;
+                case 180:
+                    info->orientation = (info->orientation - 2 + 4) % 4;
+                    break;
+                case 270:
+                    info->orientation = (info->orientation - 3 + 4) % 4;
+                    info->w = hwc.getHeight(type);
+                    info->h = hwc.getWidth(type);
+                    info->xdpi = ydpi;
+                    info->ydpi = xdpi;
+                    break;
+            }
+        }
+    }
 
     return NO_ERROR;
 }
@@ -1150,8 +1176,26 @@ void SurfaceFlinger::handleTransactionLocked(uint32_t transactionFlags)
                                 || (state.viewport != draw[i].viewport)
                                 || (state.frame != draw[i].frame))
                         {
-                            disp->setProjection(state.orientation,
+                            int orientation = state.orientation;
+                            if (state.type == DisplayDevice::DISPLAY_PRIMARY) {
+                                char property[PROPERTY_VALUE_MAX];
+                                if (property_get("ro.sf.rotation", property, NULL) > 0) {
+                                    switch (atoi(property)) {
+                                        case 90:
+                                            orientation = (state.orientation + 1) % 4;
+                                            break;
+                                        case 180:
+                                            orientation = (state.orientation + 2) % 4;
+                                            break;
+                                        case 270:
+                                            orientation = (state.orientation + 3) % 4;
+                                            break;
+                                    }
+                                }
+                            }
+                            disp->setProjection(orientation,
                                     state.viewport, state.frame);
+                            mHwc->setDisplayProject(i, state.frame);
                         }
                     }
                 }
@@ -1204,6 +1248,7 @@ void SurfaceFlinger::handleTransactionLocked(uint32_t transactionFlags)
                             }
                         } else {
                             mEventThread->onHotplugReceived(state.type, true);
+                         mHwc->setDisplayProject(i, state.frame);
                         }
                     }
                 }
@@ -2887,10 +2932,6 @@ status_t SurfaceFlinger::captureScreenImplCpuConsumerLocked(
         return INVALID_OPERATION;
     }
 
-    // get screen geometry
-    const uint32_t hw_w = hw->getWidth();
-    const uint32_t hw_h = hw->getHeight();
-
     // if we have secure windows on this display, never allow the screen capture
     if (hw->getSecureLayerVisible()) {
         ALOGW("FB is protected: PERMISSION_DENIED");
@@ -2970,6 +3011,28 @@ status_t SurfaceFlinger::captureScreenImplCpuConsumerLocked(
     DisplayDevice::setViewportAndProjection(hw);
 
     return result;
+}
+
+int SurfaceFlinger::setDisplayParameter(const sp<IBinder>& display, int cmd,
+        int para0, int para1, int para2) {
+    int32_t type = BAD_VALUE;
+    for (int i=0 ; i<DisplayDevice::NUM_DISPLAY_TYPES ; i++) {
+        if (display == mDefaultDisplays[i]) {
+            type = i;
+            break;
+        }
+    }
+
+    if (type < 0) {
+        return type;
+    }
+
+    const HWComposer& hwc(getHwComposer());
+    if (!hwc.isConnected(type)) {
+        return NAME_NOT_FOUND;
+    }
+
+    return hwc.setDisplayParameter(cmd, type, para0, para1);
 }
 
 // ---------------------------------------------------------------------------

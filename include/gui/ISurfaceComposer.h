@@ -117,6 +117,9 @@ public:
             uint32_t reqWidth, uint32_t reqHeight,
             uint32_t minLayerZ, uint32_t maxLayerZ,
             bool isCpuConsumer) = 0;
+
+    virtual int setDisplayParameter(const sp<IBinder>& display, int cmd, int para0,
+            int para1, int para2) = 0;
 };
 
 // ----------------------------------------------------------------------------
@@ -139,6 +142,7 @@ public:
         GET_DISPLAY_INFO,
         CONNECT_DISPLAY,
         CAPTURE_SCREEN,
+        SET_DISPLAY_PARAMETER,
     };
 
     virtual status_t onTransact(uint32_t code, const Parcel& data,

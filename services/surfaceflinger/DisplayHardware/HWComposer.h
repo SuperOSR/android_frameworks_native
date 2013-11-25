@@ -31,6 +31,8 @@
 #include <utils/Thread.h>
 #include <utils/Timers.h>
 #include <utils/Vector.h>
+#include <hardware/hardware.h>
+#include <hardware/hwcomposer.h>
 
 extern "C" int clock_nanosleep(clockid_t clock_id, int flags,
                            const struct timespec *request,
@@ -276,6 +278,10 @@ public:
 
     // for debugging ----------------------------------------------------------
     void dump(String8& out, char* scratch, size_t SIZE) const;
+
+    void setDisplayProject(int disp, const Rect& frame);
+    int setDisplayParameter(int cmd, int disp, int para0, int para1) const;
+    hwc_rect_t mFrame[MAX_DISPLAYS];
 
 private:
     void loadHwcModule();

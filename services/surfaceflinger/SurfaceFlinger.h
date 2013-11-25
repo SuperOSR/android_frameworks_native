@@ -380,6 +380,8 @@ private:
      * Display management
      */
 
+    virtual int setDisplayParameter(const sp<IBinder>& display, int cmd,
+            int para0, int para1, int para2);
 
     /* ------------------------------------------------------------------------
      * Debugging & dumpsys

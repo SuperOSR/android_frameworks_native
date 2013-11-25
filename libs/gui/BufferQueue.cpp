@@ -37,6 +37,7 @@
 #define ST_LOGI(x, ...) ALOGI("[%s] "x, mConsumerName.string(), ##__VA_ARGS__)
 #define ST_LOGW(x, ...) ALOGW("[%s] "x, mConsumerName.string(), ##__VA_ARGS__)
 #define ST_LOGE(x, ...) ALOGE("[%s] "x, mConsumerName.string(), ##__VA_ARGS__)
+#define BQ_LOGD(x, ...) ALOGV("[%s] "x, mConsumerName.string(), ##__VA_ARGS__)
 
 #define ATRACE_BUFFER_INDEX(index)                                            \
     if (ATRACE_ENABLED()) {                                                   \
@@ -258,7 +259,7 @@ status_t BufferQueue::requestBuffer(int slot, sp<GraphicBuffer>* buf) {
 status_t BufferQueue::dequeueBuffer(int *outBuf, sp<Fence>* outFence,
         uint32_t w, uint32_t h, uint32_t format, uint32_t usage) {
     ATRACE_CALL();
-    ST_LOGV("dequeueBuffer: w=%d h=%d fmt=%#x usage=%#x", w, h, format, usage);
+    BQ_LOGD("#dequeueBuffer: w=%d h=%d fmt=%#x usage=%#x %p", w, h, format, usage, this);
 
     if ((w && !h) || (!w && h)) {
         ST_LOGE("dequeueBuffer: invalid size: w=%u, h=%u", w, h);
@@ -350,6 +351,9 @@ status_t BufferQueue::dequeueBuffer(int *outBuf, sp<Fence>* outFence,
             // the max buffer count to change.
             tryAgain = found == INVALID_BUFFER_SLOT;
             if (tryAgain) {
+                for (int i = 0; i < maxBufferCount; i++) {
+                    BQ_LOGD("#dequeueBuffer tryAgain buf:%d state:%d", i, mSlots[i].mBufferState);
+                }
                 mDequeueCondition.wait(mMutex);
             }
         }
@@ -401,6 +405,7 @@ status_t BufferQueue::dequeueBuffer(int *outBuf, sp<Fence>* outFence,
 
     if (returnFlags & IGraphicBufferProducer::BUFFER_NEEDS_REALLOCATION) {
         status_t error;
+        mGraphicBufferAlloc->acquireBufferReferenceSlot(*outBuf);
         sp<GraphicBuffer> graphicBuffer(
                 mGraphicBufferAlloc->createGraphicBuffer(
                         w, h, format, usage, &error));
@@ -435,8 +440,8 @@ status_t BufferQueue::dequeueBuffer(int *outBuf, sp<Fence>* outFence,
         eglDestroySyncKHR(dpy, eglFence);
     }
 
-    ST_LOGV("dequeueBuffer: returning slot=%d buf=%p flags=%#x", *outBuf,
-            mSlots[*outBuf].mGraphicBuffer->handle, returnFlags);
+    BQ_LOGD("#dequeueBuffer: returning slot=%d buf=%p flags=%#x %p", *outBuf,
+            mSlots[*outBuf].mGraphicBuffer->handle, returnFlags, this);
 
     return returnFlags;
 }
@@ -491,10 +496,10 @@ status_t BufferQueue::queueBuffer(int buf,
         return BAD_VALUE;
     }
 
-    ST_LOGV("queueBuffer: slot=%d time=%#llx crop=[%d,%d,%d,%d] tr=%#x "
-            "scale=%s",
+    BQ_LOGD("##queueBuffer: slot=%d time=%#llx crop=[%d,%d,%d,%d] tr=%#x "
+            "scale=%s %p",
             buf, timestamp, crop.left, crop.top, crop.right, crop.bottom,
-            transform, scalingModeName(scalingMode));
+            transform, scalingModeName(scalingMode), this);
 
     sp<ConsumerListener> listener;
 
@@ -779,6 +784,7 @@ void BufferQueue::dump(String8& result, const char* prefix,
 void BufferQueue::freeBufferLocked(int slot) {
     ST_LOGV("freeBufferLocked: slot=%d", slot);
     mSlots[slot].mGraphicBuffer = 0;
+    mGraphicBufferAlloc->releaseBufferReferenceSlot(slot);
     if (mSlots[slot].mBufferState == BufferSlot::ACQUIRED) {
         mSlots[slot].mNeedsCleanupOnRelease = true;
     }
@@ -807,6 +813,8 @@ void BufferQueue::freeAllBuffersLocked() {
 status_t BufferQueue::acquireBuffer(BufferItem *buffer) {
     ATRACE_CALL();
     Mutex::Autolock _l(mMutex);
+
+    BQ_LOGD("###acquireBuffer %p", this);
 
     // Check that the consumer doesn't currently have the maximum number of
     // buffers acquired.  We allow the max buffer count to be exceeded by one
@@ -855,6 +863,8 @@ status_t BufferQueue::acquireBuffer(BufferItem *buffer) {
         mDequeueCondition.broadcast();
 
         ATRACE_INT(mConsumerName.string(), mQueue.size());
+
+        BQ_LOGD("###acquireBuffer ok buf:%d %p", buf, this);
     } else {
         return NO_BUFFER_AVAILABLE;
     }
@@ -866,6 +876,8 @@ status_t BufferQueue::releaseBuffer(int buf, EGLDisplay display,
         EGLSyncKHR eglFence, const sp<Fence>& fence) {
     ATRACE_CALL();
     ATRACE_BUFFER_INDEX(buf);
+
+    BQ_LOGD("####releaseBuffer ok buf:%d %p", buf, this);
 
     Mutex::Autolock _l(mMutex);
 

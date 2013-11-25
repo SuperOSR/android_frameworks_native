@@ -142,6 +142,10 @@ public:
             const Rect& layerStackRect,
             const Rect& displayRect);
 
+    // Set parameter
+    static int setDisplayParameter(const sp<IBinder>& display, int cmd, int para0,
+            int para1, int para2);
+
 private:
     virtual void onFirstRef();
     Composer& getComposer();

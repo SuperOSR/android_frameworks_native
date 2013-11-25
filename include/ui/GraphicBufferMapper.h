@@ -53,6 +53,8 @@ public:
     // dumps information about the mapping of this handle
     void dump(buffer_handle_t handle);
 
+    status_t get_phy_addess(buffer_handle_t handle, void** vaddr);
+
 private:
     friend class Singleton<GraphicBufferMapper>;
     GraphicBufferMapper();
