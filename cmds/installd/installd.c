@@ -16,6 +16,8 @@
 
 #include <sys/capability.h>
 #include <linux/prctl.h>
+#include <selinux/android.h>
+#include <selinux/avc.h>
 
 #include "installd.h"
 
@@ -83,7 +85,7 @@ static int do_get_size(char **arg, char reply[REPLY_MAX])
     int64_t asecsize = 0;
     int res = 0;
 
-        /* pkgdir, persona, apkpath */
+        /* pkgdir, userid, apkpath */
     res = get_size(arg[0], atoi(arg[1]), arg[2], arg[3], arg[4], arg[5],
             &codesize, &datasize, &cachesize, &asecsize);
 
@@ -109,7 +111,7 @@ static int do_mk_user_data(char **arg, char reply[REPLY_MAX])
 
 static int do_rm_user(char **arg, char reply[REPLY_MAX])
 {
-    return delete_persona(atoi(arg[0])); /* userid */
+    return delete_user(atoi(arg[0])); /* userid */
 }
 
 static int do_movefiles(char **arg, char reply[REPLY_MAX])
@@ -199,7 +201,7 @@ static int execute(int s, char cmd[BUFFER_MAX])
     unsigned short count;
     int ret = -1;
 
-//    ALOGI("execute('%s')\n", cmd);
+    // ALOGI("execute('%s')\n", cmd);
 
         /* default reply is "" */
     reply[0] = 0;
@@ -241,7 +243,7 @@ done:
     if (n > BUFFER_MAX) n = BUFFER_MAX;
     count = n;
 
-//    ALOGI("reply: '%s'\n", cmd);
+    // ALOGI("reply: '%s'\n", cmd);
     if (writex(s, &count, sizeof(count))) return -1;
     if (writex(s, cmd, count)) return -1;
     return 0;
@@ -526,6 +528,7 @@ int main(const int argc, const char *argv[]) {
     struct sockaddr addr;
     socklen_t alen;
     int lsocket, s, count;
+    int selinux_enabled = (is_selinux_enabled() > 0);
 
     ALOGI("installd firing up\n");
 
@@ -536,6 +539,11 @@ int main(const int argc, const char *argv[]) {
 
     if (initialize_directories() < 0) {
         ALOGE("Could not create directories; exiting.\n");
+        exit(1);
+    }
+
+    if (selinux_enabled && selinux_status_open(true) < 0) {
+        ALOGE("Could not open selinux status; exiting.\n");
         exit(1);
     }
 
@@ -577,6 +585,9 @@ int main(const int argc, const char *argv[]) {
                 break;
             }
             buf[count] = 0;
+            if (selinux_enabled && selinux_status_updated() > 0) {
+                selinux_android_seapp_context_reload();
+            }
             if (execute(s, buf)) break;
         }
         ALOGI("closing connection\n");

@@ -70,11 +70,16 @@ public:
     /* return an IDisplayEventConnection */
     virtual sp<IDisplayEventConnection> createDisplayEventConnection() = 0;
 
-    /* create a display
+    /* create a virtual display
      * requires ACCESS_SURFACE_FLINGER permission.
      */
     virtual sp<IBinder> createDisplay(const String8& displayName,
             bool secure) = 0;
+
+    /* destroy a virtual display
+     * requires ACCESS_SURFACE_FLINGER permission.
+     */
+    virtual void destroyDisplay(const sp<IBinder>& display) = 0;
 
     /* get the token for the existing default displays. possible values
      * for id are eDisplayIdMain and eDisplayIdHdmi.
@@ -115,11 +120,12 @@ public:
     virtual status_t captureScreen(const sp<IBinder>& display,
             const sp<IGraphicBufferProducer>& producer,
             uint32_t reqWidth, uint32_t reqHeight,
-            uint32_t minLayerZ, uint32_t maxLayerZ,
-            bool isCpuConsumer) = 0;
+            uint32_t minLayerZ, uint32_t maxLayerZ) = 0;
 
+#ifdef TARGET_BOARD_FIBER
     virtual int setDisplayParameter(const sp<IBinder>& display, int cmd, int para0,
             int para1, int para2) = 0;
+#endif
 };
 
 // ----------------------------------------------------------------------------
@@ -134,6 +140,7 @@ public:
         CREATE_GRAPHIC_BUFFER_ALLOC,
         CREATE_DISPLAY_EVENT_CONNECTION,
         CREATE_DISPLAY,
+        DESTROY_DISPLAY,
         GET_BUILT_IN_DISPLAY,
         SET_TRANSACTION_STATE,
         AUTHENTICATE_SURFACE,
@@ -142,7 +149,9 @@ public:
         GET_DISPLAY_INFO,
         CONNECT_DISPLAY,
         CAPTURE_SCREEN,
+#ifdef TARGET_BOARD_FIBER
         SET_DISPLAY_PARAMETER,
+#endif
     };
 
     virtual status_t onTransact(uint32_t code, const Parcel& data,

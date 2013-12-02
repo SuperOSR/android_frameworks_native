@@ -49,6 +49,7 @@ namespace android {
 
 class GraphicBuffer;
 class Fence;
+class FloatRect;
 class Region;
 class String8;
 class SurfaceFlinger;
@@ -65,7 +66,9 @@ public:
     };
 
     enum {
-        MAX_DISPLAYS = HWC_NUM_DISPLAY_TYPES + 1
+        NUM_BUILTIN_DISPLAYS = HWC_NUM_PHYSICAL_DISPLAY_TYPES,
+        MAX_HWC_DISPLAYS = HWC_NUM_DISPLAY_TYPES,
+        VIRTUAL_DISPLAY_ID_BASE = HWC_DISPLAY_VIRTUAL,
     };
 
     HWComposer(
@@ -76,15 +79,16 @@ public:
 
     status_t initCheck() const;
 
-    // returns a display ID starting at MAX_DISPLAYS, this ID
-    // is to be used with createWorkList (and all other
-    // methods requiring an ID below).
-    // IDs below MAX_DISPLAY are pre-defined and therefore are always valid.
-    // returns a negative error code if an ID cannot be allocated
+    // Returns a display ID starting at VIRTUAL_DISPLAY_ID_BASE, this ID is to
+    // be used with createWorkList (and all other methods requiring an ID
+    // below).
+    // IDs below NUM_BUILTIN_DISPLAYS are pre-defined and therefore are
+    // always valid.
+    // Returns -1 if an ID cannot be allocated
     int32_t allocateDisplayId();
 
-    // recycles the given ID and frees the associated worklist.
-    // IDs below MAX_DISPLAYS are not recycled
+    // Recycles the given virtual display ID and frees the associated worklist.
+    // IDs below NUM_BUILTIN_DISPLAYS are not recycled.
     status_t freeDisplayId(int32_t id);
 
 
@@ -160,7 +164,7 @@ public:
         virtual void setBlending(uint32_t blending) = 0;
         virtual void setTransform(uint32_t transform) = 0;
         virtual void setFrame(const Rect& frame) = 0;
-        virtual void setCrop(const Rect& crop) = 0;
+        virtual void setCrop(const FloatRect& crop) = 0;
         virtual void setVisibleRegionScreen(const Region& reg) = 0;
         virtual void setBuffer(const sp<GraphicBuffer>& buffer) = 0;
         virtual void setAcquireFenceFd(int fenceFd) = 0;
@@ -277,11 +281,12 @@ public:
     friend class VSyncThread;
 
     // for debugging ----------------------------------------------------------
-    void dump(String8& out, char* scratch, size_t SIZE) const;
-
+    void dump(String8& out) const;
+#ifdef TARGET_BOARD_FIBER
     void setDisplayProject(int disp, const Rect& frame);
     int setDisplayParameter(int cmd, int disp, int para0, int para1) const;
     hwc_rect_t mFrame[MAX_DISPLAYS];
+#endif
 
 private:
     void loadHwcModule();
@@ -338,20 +343,20 @@ private:
     struct hwc_composer_device_1*   mHwc;
     // invariant: mLists[0] != NULL iff mHwc != NULL
     // mLists[i>0] can be NULL. that display is to be ignored
-    struct hwc_display_contents_1*  mLists[MAX_DISPLAYS];
-    DisplayData                     mDisplayData[MAX_DISPLAYS];
+    struct hwc_display_contents_1*  mLists[MAX_HWC_DISPLAYS];
+    DisplayData                     mDisplayData[MAX_HWC_DISPLAYS];
     size_t                          mNumDisplays;
 
     cb_context*                     mCBContext;
     EventHandler&                   mEventHandler;
-    size_t                          mVSyncCount;
+    size_t                          mVSyncCounts[HWC_NUM_PHYSICAL_DISPLAY_TYPES];
     sp<VSyncThread>                 mVSyncThread;
     bool                            mDebugForceFakeVSync;
     BitSet32                        mAllocatedDisplayIDs;
 
     // protected by mLock
     mutable Mutex mLock;
-    mutable nsecs_t mLastHwVSync;
+    mutable nsecs_t mLastHwVSync[HWC_NUM_PHYSICAL_DISPLAY_TYPES];
 
     // thread-safe
     mutable Mutex mEventControlLock;

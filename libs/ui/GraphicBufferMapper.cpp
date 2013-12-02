@@ -109,6 +109,7 @@ status_t GraphicBufferMapper::unlock(buffer_handle_t handle)
     return err;
 }
 
+#ifdef TARGET_BOARD_FIBER
 status_t GraphicBufferMapper::get_phy_addess(buffer_handle_t handle, void** vaddr)
 {
     ATRACE_CALL();
@@ -119,6 +120,6 @@ status_t GraphicBufferMapper::get_phy_addess(buffer_handle_t handle, void** vadd
     ALOGW_IF(err, "get_phy_addess(...) failed %d (%s)", err, strerror(-err));
     return err;
 }
-
+#endif
 // ---------------------------------------------------------------------------
 }; // namespace android

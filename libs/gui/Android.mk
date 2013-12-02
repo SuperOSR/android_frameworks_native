@@ -2,13 +2,14 @@ LOCAL_PATH:= $(call my-dir)
 include $(CLEAR_VARS)
 
 LOCAL_SRC_FILES:= \
+	IGraphicBufferConsumer.cpp \
+	IConsumerListener.cpp \
 	BitTube.cpp \
 	BufferItemConsumer.cpp \
 	BufferQueue.cpp \
 	ConsumerBase.cpp \
 	CpuConsumer.cpp \
 	DisplayEventReceiver.cpp \
-	DummyConsumer.cpp \
 	GLConsumer.cpp \
 	GraphicBufferAlloc.cpp \
 	GuiConfig.cpp \
@@ -44,6 +45,7 @@ LOCAL_MODULE:= libgui
 ifeq ($(TARGET_BOARD_PLATFORM), fiber)
 	LOCAL_CFLAGS += -DUSE_NATIVE_FENCE_SYNC
 	LOCAL_CFLAGS += -DUSE_WAIT_SYNC
+	LOCAL_CFLAGS += -DTARGET_BOARD_FIBER
 endif
 ifeq ($(TARGET_BOARD_PLATFORM), tegra)
 	LOCAL_CFLAGS += -DDONT_USE_FENCE_SYNC
