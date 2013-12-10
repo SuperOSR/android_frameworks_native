@@ -24,6 +24,7 @@
 
 #include <ui/GraphicBuffer.h>
 
+#include <gui/BufferQueue.h>
 #include <gui/IGraphicBufferAlloc.h>
 
 // ---------------------------------------------------------------------------
