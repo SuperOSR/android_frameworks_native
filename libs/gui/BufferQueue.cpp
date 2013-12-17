@@ -180,7 +180,6 @@ status_t BufferQueue::setBufferCount(int bufferCount) {
         // queue, however, so currently queued buffers still get displayed.
         freeAllBuffersLocked();
         mOverrideMaxBufferCount = bufferCount;
-        mBufferHasBeenQueued = false;
         mDequeueCondition.broadcast();
         listener = mConsumerListener;
     } // scope for lock
@@ -427,9 +426,6 @@ status_t BufferQueue::dequeueBuffer(int *outBuf, sp<Fence>* outFence, bool async
 
     if (returnFlags & IGraphicBufferProducer::BUFFER_NEEDS_REALLOCATION) {
         status_t error;
-#ifdef TARGET_BOARD_FIBER
-        mGraphicBufferAlloc->acquireBufferReferenceSlot(*outBuf);
-#endif
         sp<GraphicBuffer> graphicBuffer(
                 mGraphicBufferAlloc->createGraphicBuffer(w, h, format, usage, &error));
         if (graphicBuffer == 0) {
@@ -648,6 +644,7 @@ status_t BufferQueue::connect(const sp<IBinder>& token,
             producerControlledByApp ? "true" : "false");
     Mutex::Autolock lock(mMutex);
 
+retry:
     if (mAbandoned) {
         ST_LOGE("connect: BufferQueue has been abandoned!");
         return NO_INIT;
@@ -658,29 +655,41 @@ status_t BufferQueue::connect(const sp<IBinder>& token,
         return NO_INIT;
     }
 
+    if (mConnectedApi != NO_CONNECTED_API) {
+        ST_LOGE("connect: already connected (cur=%d, req=%d)",
+                mConnectedApi, api);
+        return -EINVAL;
+    }
+
+    // If we disconnect and reconnect quickly, we can be in a state where our slots are
+    // empty but we have many buffers in the queue.  This can cause us to run out of
+    // memory if we outrun the consumer.  Wait here if it looks like we have too many
+    // buffers queued up.
+    int maxBufferCount = getMaxBufferCountLocked(false);    // worst-case, i.e. largest value
+    if (mQueue.size() > (size_t) maxBufferCount) {
+        // TODO: make this bound tighter?
+        ST_LOGV("queue size is %d, waiting", mQueue.size());
+        mDequeueCondition.wait(mMutex);
+        goto retry;
+    }
+
     int err = NO_ERROR;
     switch (api) {
         case NATIVE_WINDOW_API_EGL:
         case NATIVE_WINDOW_API_CPU:
         case NATIVE_WINDOW_API_MEDIA:
         case NATIVE_WINDOW_API_CAMERA:
-            if (mConnectedApi != NO_CONNECTED_API) {
-                ST_LOGE("connect: already connected (cur=%d, req=%d)",
-                        mConnectedApi, api);
-                err = -EINVAL;
-            } else {
-                mConnectedApi = api;
-                output->inflate(mDefaultWidth, mDefaultHeight, mTransformHint, mQueue.size());
+            mConnectedApi = api;
+            output->inflate(mDefaultWidth, mDefaultHeight, mTransformHint, mQueue.size());
 
-                // set-up a death notification so that we can disconnect
-                // automatically when/if the remote producer dies.
-                if (token != NULL && token->remoteBinder() != NULL) {
-                    status_t err = token->linkToDeath(static_cast<IBinder::DeathRecipient*>(this));
-                    if (err == NO_ERROR) {
-                        mConnectedProducerToken = token;
-                    } else {
-                        ALOGE("linkToDeath failed: %s (%d)", strerror(-err), err);
-                    }
+            // set-up a death notification so that we can disconnect
+            // automatically when/if the remote producer dies.
+            if (token != NULL && token->remoteBinder() != NULL) {
+                status_t err = token->linkToDeath(static_cast<IBinder::DeathRecipient*>(this));
+                if (err == NO_ERROR) {
+                    mConnectedProducerToken = token;
+                } else {
+                    ALOGE("linkToDeath failed: %s (%d)", strerror(-err), err);
                 }
             }
             break;
@@ -829,9 +838,6 @@ void BufferQueue::dump(String8& result, const char* prefix) const {
 void BufferQueue::freeBufferLocked(int slot) {
     ST_LOGV("freeBufferLocked: slot=%d", slot);
     mSlots[slot].mGraphicBuffer = 0;
-#ifdef TARGET_BOARD_FIBER
-    mGraphicBufferAlloc->releaseBufferReferenceSlot(slot);
-#endif
     if (mSlots[slot].mBufferState == BufferSlot::ACQUIRED) {
         mSlots[slot].mNeedsCleanupOnRelease = true;
     }

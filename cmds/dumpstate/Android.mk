@@ -14,11 +14,6 @@ LOCAL_SRC_FILES := dumpstate.c utils.c
 
 LOCAL_MODULE := dumpstate
 
-ifdef BOARD_LIB_DUMPSTATE
-LOCAL_STATIC_LIBRARIES := $(BOARD_LIB_DUMPSTATE)
-LOCAL_CFLAGS += -DBOARD_HAS_DUMPSTATE
-endif
-
 LOCAL_SHARED_LIBRARIES := libcutils liblog libselinux
 LOCAL_HAL_STATIC_LIBRARIES := libdumpstate
 LOCAL_CFLAGS += -Wall -Wno-unused-parameter -std=gnu99

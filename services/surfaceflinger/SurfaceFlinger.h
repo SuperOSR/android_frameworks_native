@@ -380,11 +380,6 @@ private:
      * Display management
      */
 
-#ifdef TARGET_BOARD_FIBER
-    virtual int setDisplayParameter(const sp<IBinder>& display, int cmd,
-            int para0, int para1, int para2);
-#endif
-
     /* ------------------------------------------------------------------------
      * VSync
      */
