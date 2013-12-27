@@ -145,6 +145,12 @@ public:
             const Rect& layerStackRect,
             const Rect& displayRect);
 
+#ifdef TARGET_BOARD_FIBER
+    // Set parameter
+    static int setDisplayParameter(const sp<IBinder>& display, int cmd, int para0,
+            int para1, int para2);
+
+#endif
 private:
     virtual void onFirstRef();
     Composer& getComposer();

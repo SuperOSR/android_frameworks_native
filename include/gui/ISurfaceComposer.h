@@ -121,6 +121,11 @@ public:
             const sp<IGraphicBufferProducer>& producer,
             uint32_t reqWidth, uint32_t reqHeight,
             uint32_t minLayerZ, uint32_t maxLayerZ) = 0;
+
+#ifdef TARGET_BOARD_FIBER
+    virtual int setDisplayParameter(const sp<IBinder>& display, int cmd, int para0,
+            int para1, int para2) = 0;
+#endif
 };
 
 // ----------------------------------------------------------------------------
@@ -144,6 +149,9 @@ public:
         GET_DISPLAY_INFO,
         CONNECT_DISPLAY,
         CAPTURE_SCREEN,
+#ifdef TARGET_BOARD_FIBER
+        SET_DISPLAY_PARAMETER,
+#endif
     };
 
     virtual status_t onTransact(uint32_t code, const Parcel& data,

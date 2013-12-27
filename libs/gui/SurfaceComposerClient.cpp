@@ -617,6 +617,14 @@ void SurfaceComposerClient::unblankDisplay(const sp<IBinder>& token) {
     ComposerService::getComposerService()->unblank(token);
 }
 
+#ifdef TARGET_BOARD_FIBER
+int SurfaceComposerClient::setDisplayParameter(
+        const sp<IBinder>& display, int cmd, int para0, int para1, int para2)
+{
+    return ComposerService::getComposerService()->setDisplayParameter(display,
+            cmd, para0, para1, para2);
+}
+#endif
 // ----------------------------------------------------------------------------
 
 status_t ScreenshotClient::capture(

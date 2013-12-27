@@ -31,6 +31,9 @@
 #include <utils/Thread.h>
 #include <utils/Timers.h>
 #include <utils/Vector.h>
+#ifdef TARGET_BOARD_FIBER
+#include <hardware/hwcomposer.h>
+#endif
 
 extern "C" int clock_nanosleep(clockid_t clock_id, int flags,
                            const struct timespec *request,
@@ -280,6 +283,11 @@ public:
 
     // for debugging ----------------------------------------------------------
     void dump(String8& out) const;
+#ifdef TARGET_BOARD_FIBER
+    void setDisplayProject(int disp, const Rect& frame);
+    int setDisplayParameter(int cmd, int disp, int para0, int para1) const;
+    hwc_rect_t mFrame[MAX_HWC_DISPLAYS];
+#endif
 
 private:
     void loadHwcModule();

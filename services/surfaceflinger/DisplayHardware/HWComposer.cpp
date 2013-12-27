@@ -91,6 +91,12 @@ HWComposer::HWComposer(
 {
     for (size_t i =0 ; i<MAX_HWC_DISPLAYS ; i++) {
         mLists[i] = 0;
+#ifdef TARGET_BOARD_FIBER
+        mFrame[i].left = 0;
+        mFrame[i].top = 0;
+        mFrame[i].right = -1;
+        mFrame[i].bottom = -1;
+#endif
     }
 
     for (size_t i=0 ; i<HWC_NUM_PHYSICAL_DISPLAY_TYPES ; i++) {
@@ -615,6 +621,12 @@ status_t HWComposer::prepare() {
                 mLists[i]->dpy = EGL_NO_DISPLAY;
                 mLists[i]->sur = EGL_NO_SURFACE;
             }
+#ifdef TARGET_BOARD_FIBER
+            mLists[i]->frame.left = mFrame[i].left;
+            mLists[i]->frame.top = mFrame[i].top ;
+            mLists[i]->frame.right = mFrame[i].right;
+            mLists[i]->frame.bottom = mFrame[i].bottom;
+#endif
         }
     }
 
@@ -658,6 +670,16 @@ status_t HWComposer::prepare() {
             }
         }
     }
+#ifdef TARGET_BOARD_FIBER
+    else
+    {
+        for (size_t i=0 ; i<mNumDisplays ; i++) {
+            DisplayData& disp(mDisplayData[i]);
+            disp.hasFbComp = false;
+            disp.hasOvComp = false;
+            }
+    }
+#endif
     return (status_t)err;
 }
 
@@ -1090,6 +1112,24 @@ void HWComposer::dump(String8& result) const {
     }
 }
 
+#ifdef TARGET_BOARD_FIBER
+void HWComposer::setDisplayProject(int disp, const Rect& frame)
+{
+    mFrame[disp].left = frame.leftTop().x;
+    mFrame[disp].top = frame.leftTop().y;
+    mFrame[disp].right = frame.rightBottom().x;
+    mFrame[disp].bottom = frame.rightBottom().y;
+}
+
+int HWComposer::setDisplayParameter(int cmd, int disp, int para0, int para1) const {
+    if (mHwc) {
+        return mHwc->setParameter(mHwc, cmd, disp, para0, para1);
+    }
+
+    return NO_INIT;
+}
+
+#endif
 // ---------------------------------------------------------------------------
 
 HWComposer::VSyncThread::VSyncThread(HWComposer& hwc)

@@ -724,6 +724,32 @@ status_t SurfaceFlinger::getDisplayInfo(const sp<IBinder>& display, DisplayInfo*
     // All non-virtual displays are currently considered secure.
     info->secure = true;
 
+#ifdef TARGET_BOARD_FIBER
+    if (type == DisplayDevice::DISPLAY_PRIMARY) {
+        char property[PROPERTY_VALUE_MAX];
+        if (property_get("ro.sf.rotation", property, NULL) > 0) {
+            switch (atoi(property)) {
+                case 90:
+                    info->orientation = (info->orientation - 1 + 4) % 4;
+                    info->w = hwc.getHeight(type);
+                    info->h = hwc.getWidth(type);
+                    info->xdpi = ydpi;
+                    info->ydpi = xdpi;
+                    break;
+                case 180:
+                    info->orientation = (info->orientation - 2 + 4) % 4;
+                    break;
+                case 270:
+                    info->orientation = (info->orientation - 3 + 4) % 4;
+                    info->w = hwc.getHeight(type);
+                    info->h = hwc.getWidth(type);
+                    info->xdpi = ydpi;
+                    info->ydpi = xdpi;
+                    break;
+            }
+        }
+    }
+#endif
     return NO_ERROR;
 }
 
@@ -1293,7 +1319,26 @@ void SurfaceFlinger::handleTransactionLocked(uint32_t transactionFlags)
                                 || (state.viewport != draw[i].viewport)
                                 || (state.frame != draw[i].frame))
                         {
-                            disp->setProjection(state.orientation,
+                            int orientation = state.orientation;
+#ifdef TARGET_BOARD_FIBER
+                            if (state.type == DisplayDevice::DISPLAY_PRIMARY) {
+                                char property[PROPERTY_VALUE_MAX];
+                                if (property_get("ro.sf.rotation", property, NULL) > 0) {
+                                    switch (atoi(property)) {
+                                        case 90:
+                                            orientation = (state.orientation + 1) % 4;
+                                            break;
+                                        case 180:
+                                            orientation = (state.orientation + 2) % 4;
+                                            break;
+                                        case 270:
+                                            orientation = (state.orientation + 3) % 4;
+                                            break;
+                                    }
+                                }
+                            }
+#endif
+                            disp->setProjection(orientation,
                                     state.viewport, state.frame);
                         }
                     }
@@ -1361,6 +1406,9 @@ void SurfaceFlinger::handleTransactionLocked(uint32_t transactionFlags)
                             }
                         } else {
                             mEventThread->onHotplugReceived(state.type, true);
+#ifdef TARGET_BOARD_FIBER
+                         mHwc->setDisplayProject(i, state.frame);
+#endif
                         }
                     }
                 }
@@ -3099,6 +3147,30 @@ void SurfaceFlinger::checkScreenshot(size_t w, size_t s, size_t h, void const* v
         }
     }
 }
+
+#ifdef TARGET_BOARD_FIBER
+int SurfaceFlinger::setDisplayParameter(const sp<IBinder>& display, int cmd,
+        int para0, int para1, int para2) {
+    int32_t type = BAD_VALUE;
+    for (int i=0 ; i<DisplayDevice::NUM_BUILTIN_DISPLAY_TYPES ; i++) {
+        if (display == mBuiltinDisplays[i]) {
+            type = i;
+            break;
+        }
+    }
+
+    if (type < 0) {
+        return type;
+    }
+
+    const HWComposer& hwc(getHwComposer());
+    if (!hwc.isConnected(type)) {
+        return NAME_NOT_FOUND;
+    }
+
+    return hwc.setDisplayParameter(cmd, type, para0, para1);
+}
+#endif
 
 // ---------------------------------------------------------------------------
 
